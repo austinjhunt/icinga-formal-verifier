@@ -17,6 +17,7 @@ With this project, my goal is to learn how to navigate and apply nuXmv proficien
 ### Foundation - Icinga Architecture
 
 To give some clarification, Icinga 2 is a distributed system for network monitoring and alerting that follows a [hierarchical architecture based on zones and roles](https://icinga.com/docs/icinga-2/latest/doc/06-distributed-monitoring/). Take the following example:
+
 ![Icinga 2 distributed monitoring & zones](img/icinga2_distributed_monitoring_zones.png)
 The above architecture has one **Master node** on top of the hierarchy (in a Master zone), and two **Satellite** nodes (children of the master), where the left Satellite belongs to **Zone EU** (call it EU-S1 for the first satellite in Zone EU) and the right satellite belongs to Zone USA (call this one USA-S1).
 
