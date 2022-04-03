@@ -36,6 +36,19 @@ accesses and sends that information back to the requestor. In the case of an age
 Each of the satellites is responsible for sending periodic checks (upon receiving check commands from
 the master, where the intervals are user-defined) to the child agents (e.g. each NCPA agent running on each host in some zone) and returning the results of those checks to the master. So, at a high level, we have some number N of satellites, with each satellite receiving commands, acting on those commands, and returning information to the commander (the master).
 
+##### Host Check
+
+A Host check is really just a check to ensure that a host is still alive, which equates to a ping against the target host. Each host runs an agent, e.g. NCPA for this case study. This kind of check runs against all hosts, at a frequency of 1 check per minute. Each host has an address (domain name or IP) and belongs to some zone in the hierarchy, e.g. USA in the above pictured example. The zone of the host tells the master which satellite is responsible for that host and thus which satellite to send the hostalive (ping) check command to for execution. E.g. Master would send a hostalive check command to the USA satellite for execution against the USA 1 host (agent).
+
+##### Service Checks
+
+When you monitor services in Icinga 2, you need to configure service checks for the services that you want to monitor. In a nutshell, when you set up a service check, you're not just checking if a host is up or down, you're checking whether that host is either running something correctly or performing as expected. A service check has the following important attributes for this analysis:
+
+- a check command; this is the actual command that gets executed against the target host being monitored; ex: this could be an invocation of the host's NCPA api to get a particular attribute like current disk usage
+- a check frequency
+- whether it's disabled
+- assignment rules - the service check may be assigned to specific hosts matching some criteria, e.g. host name == "_database-server_"; this of course tells the master which hosts to target for the service check. Since each host belongs to some zone, e.g. USA as in the above example, and a given Satellite(s) is responsible for said zone, this tells the master which satellite to send the check command to.
+
 ##### Master
 
 With great resource allocation comes great responsibility. The master is in charge of a ton, but for this
