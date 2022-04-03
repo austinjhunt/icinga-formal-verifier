@@ -40,6 +40,8 @@ the master, where the intervals are user-defined) to the child agents (e.g. each
 
 A Host check is really just a check to ensure that a host is still alive, which equates to a ping against the target host. Each host runs an agent, e.g. NCPA for this case study. This kind of check runs against all hosts, at a frequency of 1 check per minute. Each host has an address (domain name or IP) and belongs to some zone in the hierarchy, e.g. USA in the above pictured example. The zone of the host tells the master which satellite is responsible for that host and thus which satellite to send the hostalive (ping) check command to for execution. E.g. Master would send a hostalive check command to the USA satellite for execution against the USA 1 host (agent).
 
+Once a host check is configured, you are able to monitor the real-time status (1 minute is very close to real-time) of the respective host. A host, when initially configured, is in a PENDING state. Once the check begins executing and returning a response, the response codes 0, 1, 2, 3 from the satellite indicate respectively the host states of UP and DOWN. More specifically, **0 and 1 indicate UP** and **2 and 3 indicate DOWN**. PENDING doesn't have a corresponding response code.
+
 ##### Service Checks
 
 When you monitor services in Icinga 2, you need to configure service checks for the services that you want to monitor. In a nutshell, when you set up a service check, you're not just checking if a host is up or down, you're checking whether that host is either running something correctly or performing as expected. A service check has the following important attributes for this analysis:
@@ -48,6 +50,8 @@ When you monitor services in Icinga 2, you need to configure service checks for 
 - a check frequency
 - whether it's disabled
 - assignment rules - the service check may be assigned to specific hosts matching some criteria, e.g. host name == "_database-server_"; this of course tells the master which hosts to target for the service check. Since each host belongs to some zone, e.g. USA as in the above example, and a given Satellite(s) is responsible for said zone, this tells the master which satellite to send the check command to.
+
+Once a service check has been configured, you are able to monitor the status of the respective Service. A service, when initially configured, is in a PENDING state. Once the check begins returning responses, the response codes **0, 1, 2, and 3** from the satellite indicate respectively the service states of **OK, WARNING, CRITICAL, and UNKNOWN.**
 
 ##### Master
 

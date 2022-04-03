@@ -1,0 +1,5 @@
+##### Host Check
+
+A Host check is really just a check to ensure that a host is still alive, which equates to a ping against the target host. Each host runs an agent, e.g. NCPA for this case study. This kind of check runs against all hosts, at a frequency of 1 check per minute. Each host has an address (domain name or IP) and belongs to some zone in the hierarchy, e.g. USA in the above pictured example. The zone of the host tells the master which satellite is responsible for that host and thus which satellite to send the hostalive (ping) check command to for execution. E.g. Master would send a hostalive check command to the USA satellite for execution against the USA 1 host (agent).
+
+Once a host check is configured, you are able to monitor the real-time status (1 minute is very close to real-time) of the respective host. A host, when initially configured, is in a PENDING state. Once the check begins executing and returning a response, the response codes 0, 1, 2, 3 from the satellite indicate respectively the host states of UP and DOWN. More specifically, **0 and 1 indicate UP** and **2 and 3 indicate DOWN**. PENDING doesn't have a corresponding response code.
