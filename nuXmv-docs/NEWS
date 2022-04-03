@@ -1,0 +1,52 @@
+********************** nuXmv 1.0.1 (2014-11-07) **********************
+
+This is a minor release of nuXmv that provides some internals
+improvements and several bug fixes.
+
+The list of minor improvements within this release are:
+
+- Included the low level model checking engines that participated to
+  the HWMCC 2014 as replacement of the previous ones.
+
+- Improved the conversion into SMT by avoiding memory and computation
+  blow up due to expensive internal transformations to enable for the
+  booleanization of finite domain expressions.
+
+- Avoided creation of BDD variables if not needed when verifying a
+  design using SMT techniques that often resulted in very expensive
+  computations.
+
+- Integrated several optimizations and improvements from the
+  development version of NuSMV.
+
+- Improved error message in batch mode for designs with infinite
+  domains variables. nuXmv now exits smoothly with an error message
+  and suggestions on how to verify the design instead of reporting an
+  internal error.
+
+More that 30 bugs were fixed in this version. Many thanks to those
+users who reported issues, and helped improving nuXmv. Here the most
+critical bug fixes are listed:
+
+- Fixed several corner cases in the SMT encoding that prevented the
+  use of IC3-like algorithms for the verification of designs with
+  infinite domain variables or non-bit blasted bit-vectors.
+
+- Fixed a crash of within the LTL bounded model checking via SMT
+  reported anonymously by a nuXmv user.
+
+- Avoided internal error for not supported operators for models with
+  infinite domain variables, providing the user with more informative
+  error messages.
+
+- Fixed a bug in the translation from nuXmv to AIGER while encoding
+  LTL properties and fairness constraints in the corresponding AIGER
+  file.
+
+- Fixed internal reconstruction of the counter example for k-live and
+  IC3 based algorithms.
+
+- Integrated several bug-fixes from the development version of NuSMV.
+
+**********************************************************************
+

@@ -1,0 +1,39 @@
+-- this module computes m * n
+-- based on example mult(m,n) from the Alur 2015 book
+-- note: m * n must be representable in y's finite bitvector length
+MODULE main
+  VAR
+    mode : {loop, stop};
+    x : 0 .. 1024;
+    y : 0 .. 1024;
+
+  DEFINE m := 4;
+  DEFINE n := 5;
+
+  TRANS
+    ((mode = loop & x >= 1) -> (next(mode) = loop & next(x) = x+(-1) & next(y) = y+n)) &
+    ((mode = loop & x < 1) -> (next(mode) = stop & next(x) = x & next(y) = y)) & 
+    ((mode = stop) -> (next(mode) = stop & next(x) = x & next(y) = y));
+  INIT
+    (mode = loop & x = m & y = 0);
+
+INVARSPEC
+  mode = loop;
+
+INVARSPEC
+  y = m * n;
+
+INVARSPEC
+  x > 0;
+
+-- always eventually y = m * n
+LTLSPEC
+  G F y = m * n;
+
+-- always eventually y != m * n: use to generate a counterexample
+-- trace where y = m * n.
+LTLSPEC
+  G F y != m * n;
+
+LTLSPEC
+  G F (mode = stop & x = 0);

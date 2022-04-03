@@ -1,0 +1,71 @@
+MODULE main
+  VAR
+    mode : {off,on};
+    press : boolean;
+    -- what happens if we increase the range of x values allowed?
+    x : 0..100;
+    --x : 0..1000;
+    --x : 0..10000;
+    --x : 0..100000;
+
+  DEFINE count_max := 10;
+
+  ASSIGN
+    next(mode) := case
+                    mode = off & !press : off;
+                    mode = off & press : on;
+                    mode = on & !press & x < count_max : on;
+                    mode = on & (press | x >= count_max) : off;
+                    TRUE : mode; -- stay same otherwise
+                esac;
+    next(x)    := case
+                    mode = on & !press & x < count_max : x+1;
+                    mode = on & (press | x >= count_max) : 0;
+                    TRUE : x;
+                esac;
+    init(mode) := off;
+    init(x)    := 0;
+
+-- fairness condition: it is not always possible to remain in the mode off
+--FAIRNESS
+--  mode != off;
+
+--FAIRNESS
+--  mode != off | x < count_max;
+
+--JUSTICE
+--  x < count_max;
+
+INVARSPEC
+  x <= count_max;
+
+INVARSPEC
+  x < count_max;
+
+INVARSPEC
+  x <= count_max / 2;
+
+-- always eventually mode is off and x is 0
+LTLSPEC
+  G F (mode = off & x = 0);
+
+-- always eventually mode is off AND always eventually x is 0
+LTLSPEC
+  G F (mode = off) & G F (x = 0);
+
+-- always eventually mode is off and x is count_max
+LTLSPEC
+  G F (mode = on & x = count_max);
+
+-- always eventually mode is off AND always eventually x is count_max
+LTLSPEC
+  G F (mode = on) & G F (x = count_max);
+
+-- eventually always mode is on
+LTLSPEC
+  F G (mode = on);
+
+-- eventually always mode is off
+LTLSPEC
+  F G (mode = off);
+
