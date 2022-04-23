@@ -1,0 +1,71 @@
+MODULE main
+  VAR
+    mode : {off,on};
+    press : boolean;
+    -- what happens if we increase the range of x values allowed?
+    x : 0..100;
+    --x : 0..1000;
+    --x : 0..10000;
+    --x : 0..100000;
+    -- why don't we say try using integer type for x?
+    -- This would take us into the domain of infinite state model checking, beyond our scope.
+
+  DEFINE count_max := 5;
+
+  TRANS
+    ((mode = off & !press) -> (next(mode) = off & next(x) = x)) &
+    ((mode = off & press) -> (next(mode) = on & next(x) = x)) &
+    ((mode = on & !press) & x < count_max -> (next(mode) = on & next(x) = x + 1)) &
+    ((mode = on & (press | x >= count_max)) -> (next(mode) = off & next(x) = 0));
+    -- common error: if we add the following, which we try to use as the
+    -- else case when using ASSIGN, will lead to logical absurdities (since TRUE
+    -- is satisfied by any state)
+    -- & (TRUE -> (next(mode) = mode & next(x) = x)); -- stay same otherwise
+  INIT
+    (mode = off & x = 0);
+
+-- fairness condition: it is not always possible to remain in the mode off and x < count_max
+-- Try verifying some of the specifications below with and without fairness conditions
+FAIRNESS
+  mode != off & (mode = on -> x < count_max);
+
+INVARSPEC
+  x <= count_max;
+
+INVARSPEC
+  x < count_max;
+
+INVARSPEC
+  x <= count_max / 2;
+
+-- always eventually mode is off and x is 0
+LTLSPEC
+  G F (mode = off & x = 0);
+
+-- always eventually mode is off AND always eventually x is 0
+LTLSPEC
+  G F (mode = off) & G F (x = 0);
+
+-- always eventually mode is off and x is count_max
+LTLSPEC
+  G F (mode = on & x = count_max);
+
+-- always eventually mode is off AND always eventually x is count_max
+LTLSPEC
+  G F (mode = on) & G F (x = count_max);
+
+-- eventually always mode is on
+LTLSPEC
+  F G (mode = on);
+
+-- eventually always mode is off
+LTLSPEC
+  F G (mode = off);
+
+-- eventually eventually reach mode = on (silly)
+LTLSPEC
+  F F (mode = on);
+
+-- eventually reach mode = on
+LTLSPEC
+  F (mode = on);

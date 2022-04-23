@@ -1,0 +1,113 @@
+-- this checks the icinga 2 host entity model
+-- based on the component mode presented in the README of this folder
+
+MODULE main
+  VAR host : hostModule;
+
+MODULE hostModule
+  VAR
+    -- for delaying type=soft->type=hard assignment
+    -- why don't we use integer type for checkAttempts?
+    -- this would lead to infinite state model checking, beyond our scope.
+    checkAttempts : 0 .. 1024;
+
+    -- check result code; modeling input variable as
+    -- state variable similar to how we modeled the "press" boolean input on
+    -- the switch running example as a state variable
+    res: {0, 1, 2, 3};
+    -- state variable for tracking / detecting changes in modes (UP / DOWN)
+    prevMode: {PENDING, UP, DOWN};
+
+
+    -- outputs modeled as state variables
+    mode : {PENDING, UP, DOWN};
+    type : {HARD, SOFT, PENDING} ;
+
+
+  DEFINE maxCheckAttempts := 3;
+
+  TRANS
+    -- specify state variable updates for mode = PENDING and (res = 0 or res = 1)
+    ((mode = PENDING & (res = 0 | res = 1)) -> (next(mode) = UP & next(checkAttempts) = 1 & next(type) = SOFT)) &
+
+    -- specify state variable updates for mode = PENDING and res = 2 or res = 3
+    ((mode = PENDING & (res = 2 | res = 3)) -> (next(mode) = DOWN & next(checkAttempts) = 1 & next(type) = SOFT)) &
+
+    -- specify state variable updates for mode = UP and (res = 0 or res = 1)
+    -- (self loop in the ESM)
+    ((mode = UP & (res = 0 | res = 1)) -> next(mode) = UP) &
+    ((mode = UP & (res = 0 | res = 1)) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
+    ((mode = UP & (res = 0 | res = 1)) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
+
+
+    -- specify state variable updates for mode = UP and (res = 2 or res = 3)
+    ((mode = UP & (res = 2 | res = 3)) -> next(mode) = DOWN & next(checkAttempts) = 1 & next(type) = SOFT) &
+
+    -- specify state variable updates for mode = DOWN and (res = 0 or res = 1)
+    ((mode = DOWN & (res = 0 | res = 1)) -> next(mode) = UP & next(checkAttempts) = 1 & next(type) = SOFT) &
+
+    -- specify state variable updates for mode = DOWN and (res = 2 or res = 3)
+    -- (self loop in the ESM)
+    ((mode = DOWN & (res = 2 | res = 3)) -> next(mode) = DOWN) &
+    ((mode = DOWN & (res = 2 | res = 3)) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
+    ((mode = DOWN & (res = 2 | res = 3)) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
+
+    -- would be the same thing as (next(prevMode) = mode);
+    (next(prevMode) = mode);
+
+  -- initialize mode to PENDING, checkAttempts to 0, type to PENDING
+  INIT
+    -- specify the set of initial states using a boolean expression
+    (mode = PENDING & checkAttempts = 0 & type = PENDING);
+
+
+INVARSPEC
+  checkAttempts <= maxCheckAttempts;
+
+INVARSPEC
+-- a response code of 0 (res=0) or 1 (res=1)
+-- should trigger transition to only the UP mode
+  (res = 0 | res = 1) <-> next(mode) = UP ;
+
+INVARSPEC
+-- if state is HARD then checkAttempts must equal the max (not <->)
+  (type = HARD) -> checkAttempts = maxCheckAttempts
+
+INVARSPEC
+-- response code of 2 (res=2) or 3 (res=3)
+-- should trigger transition to only the DOWN mode
+  (res = 2 | res = 3) <-> next(mode) = DOWN ;
+
+LTLSPEC
+-- it is always the case that
+-- if checkAttempts = maxCheckAttempts AND type = SOFT & mode has not changed then
+-- next type should be HARD (i.e. time to send a notification)
+  G (checkAttempts = maxCheckAttempts & type = SOFT & prevMode = mode) -> next(type) = HARD;
+
+LTLSPEC
+-- it is always the case that the check attempts resets to 1 if the mode changes
+G (next(prevMode) != mode -> next(checkAttempts) = 1)
+
+
+-- A host in `HARD` state should maintain its `HARD`
+-- state with its current `checkAttempts` value until a
+-- different response code is returned triggering a
+-- mode switch (if a host is in the `HARD` state type with
+-- `checkAttempts` equaling `maxCheckAttempts`,
+-- then the only possible next valuations for
+-- `(type, checkAttempts)` are `(SOFT, 1)` or `(HARD, checkAttempts)` )
+INVARSPEC
+  -- can be written as implication invariant
+  (type = HARD & checkAttempts = maxCheckAttempts) -> ((next(type) = SOFT & next(checkAttempts) = 1) | (next(type) = HARD & next(checkAttempts) = checkAttempts))
+LTLSPEC
+  -- can also be written as LTL specification using UNTIL (U) formula
+  -- always the case that if something's true, it's true until this other thing is true
+  -- always the case that if type=HARD & checkAttempts is at max, that stays true until type = SOFT & checkAttempts resets to 1
+  G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
+
+  -- Made a mistake in the above spec; I thought the Until LTL spec did not
+  -- require that terminating condition q to be true at any point.
+  -- Until LTLSPEC actually does require the q in "U q" to be true at some point. Rewrite in a way
+  -- that assumes q (the mode switch) does happen. In reality, this mode switch may not happen if a host
+  -- stays UP or stays DOWN indefinitely.
+  -- (F [2, ] (type = SOFT & checkAttempts = 1) )-> G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
