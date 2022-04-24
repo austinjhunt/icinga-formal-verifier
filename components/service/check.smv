@@ -1,0 +1,165 @@
+-- this checks the icinga 2 service entity model
+-- based on the component mode presented in the README of this folder
+
+MODULE main
+  VAR service : serviceModule;
+
+MODULE serviceModule
+  VAR
+    -- for delaying type=soft->type=hard assignment
+    -- why don't we use integer type for checkAttempts?
+    -- this would lead to infinite state model checking, beyond our scope.
+    checkAttempts : 0 .. 1024;
+
+    -- check result code; modeling input variable as
+    -- state variable similar to how we modeled the "press" boolean input on
+    -- the switch running example as a state variable
+    res: {0, 1, 2, 3};
+    -- state variable for tracking / detecting changes in modes (UP / DOWN)
+    prevMode: {PENDING, OK, WARN, CRIT, UNKNOWN};
+
+
+    -- outputs modeled as state variables
+    mode : {PENDING, OK, WARN, CRIT, UNKNOWN};
+    type : {HARD, SOFT, PENDING} ;
+
+
+  DEFINE maxCheckAttempts := 3;
+
+  TRANS
+    -- specify state variable updates for mode = PENDING and res = 0
+    ((mode = PENDING & res = 0) -> (next(mode) = OK) & next(checkAttempts) = 1 & next(type) = SOFT)) & 
+
+    -- specify state variable updates for mode = PENDING and res = 1
+    ((mode = PENDING & res = 1) -> (next(mode) = WARN) & next(checkAttempts) = 1 & next(type) = SOFT)) & 
+
+    -- specify state variable updates for mode = PENDING and res = 2
+    ((mode = PENDING & res = 2) -> (next(mode) = CRIT) & next(checkAttempts) = 1 & next(type) = SOFT)) & 
+
+    -- specify state variable updates for mode = PENDING and res = 0
+    ((mode = PENDING & res = 3) -> (next(mode) = UNKNOWN) & next(checkAttempts) = 1 & next(type) = SOFT)) & 
+
+    -- BEGIN SELF LOOP TRANSITIONS -- 
+    -- specify state variable updates for mode = OK and res = 0 
+    -- (self loop in the ESM)
+    ((mode = OK & res = 0) -> next(mode) = OK) &
+    ((mode = OK & res = 0) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
+    ((mode = OK & res = 0) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
+
+    -- specify state variable updates for mode = WARN and res = 1 
+    -- (self loop in the ESM)
+    ((mode = WARN & res = 1) -> next(mode) = WARN) &
+    ((mode = WARN & res = 1) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
+    ((mode = WARN & res = 1) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
+
+    -- specify state variable updates for mode = CRIT and res = 2 
+    -- (self loop in the ESM)
+    ((mode = CRIT & res = 2) -> next(mode) = WARN) &
+    ((mode = CRIT & res = 2) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
+    ((mode = CRIT & res = 2) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
+
+    -- specify state variable updates for mode = UNKNOWN and res = 3 
+    -- (self loop in the ESM)
+    ((mode = UNKNOWN & res = 3) -> next(mode) = UNKNOWN) &
+    ((mode = UNKNOWN & res = 3) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
+    ((mode = UNKNOWN & res = 3) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
+    -- END SELF LOOP TRANSITIONS --
+
+    -- BEGIN mode=OK -> next(mode)!=OK TRANSITIONS ---
+    -- specify state variable updates for mode = OK and res = 1
+    ((mode = OK & res = 1) -> next(mode) = WARN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specify state variable updates for mode = OK and res = 2
+    ((mode = OK & res = 2) -> next(mode) = CRIT & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specify state variable updates for mode = OK and res = 2
+    ((mode = OK & res = 3) -> next(mode) = UNKNOWN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- END mode=OK -> TRANSITIONS ---
+
+    -- BEGIN mode=WARN -> next(mode)!=WARN TRANSITIONS ---
+    -- specify state variable updates for mode = WARN and res = 0
+    ((mode = WARN & res = 0) -> next(mode) = OK & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specify state variable updates for mode = WARN and res = 2
+    ((mode = WARN & res = 2) -> next(mode) = CRIT & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specifcy state variable updates for mode = OK and res = 2
+    ((mode = WARN & res = 3) -> next(mode) = UNKNOWN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- END mode=OK -> TRANSITIONS ---
+
+    -- BEGIN mode=CRIT -> next(mode)!=CRIT TRANSITIONS ---
+    -- specify state variable updates for mode = WARN and res = 0
+    ((mode = CRIT & res = 0) -> next(mode) = OK & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specify state variable updates for mode = WARN and res = 2
+    ((mode = CRIT & res = 1) -> next(mode) = WARN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specifcy state variable updates for mode = OK and res = 2
+    ((mode = CRIT & res = 3) -> next(mode) = UNKNOWN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- END mode=OK -> TRANSITIONS ---
+
+    -- BEGIN mode=UNKNOWN -> next(mode)!=UNKNOWN TRANSITIONS ---
+    -- specify state variable updates for mode = WARN and res = 0
+    ((mode = UNKNOWN & res = 0) -> next(mode) = OK & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specify state variable updates for mode = WARN and res = 2
+    ((mode = UNKNOWN & res = 1) -> next(mode) = WARN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- specifcy state variable updates for mode = OK and res = 2
+    ((mode = UNKNOWN & res = 2) -> next(mode) = UNKNOWN & next(checkAttempts) = 1 & next(type) = SOFT) &
+    -- END mode=OK -> TRANSITIONS ---
+     
+    (next(prevMode) = mode);
+
+  -- initialize mode to PENDING, checkAttempts to 0, type to PENDING
+  INIT
+    -- specify the set of initial states using a boolean expression
+    (mode = PENDING & checkAttempts = 0 & type = PENDING);
+
+
+INVARSPEC
+  checkAttempts <= maxCheckAttempts;
+
+INVARSPEC
+-- a response code of 0 (res=0) should trigger transition to only the OK mode
+  (res = 0 <-> next(mode) = OK) ;
+INVARSPEC
+-- a response code of 1 (res=1) should trigger transition to only the WARN mode
+  (res = 1 <-> next(mode) = WARN) ;
+INVARSPEC
+-- a response code of 2 (res=2) should trigger transition to only the CRIT mode
+  (res = 2 <-> next(mode) = CRIT) ;
+INVARSPEC
+-- a response code of 3 (res=3) should trigger transition to only the UNKNOWN mode
+  (res = 3 <-> next(mode) = UNKNOWN) ;
+
+INVARSPEC
+-- if state is HARD then checkAttempts must equal the max 
+-- check attempts equaling the max happens right before the state is hard so not <->
+  (type = HARD) -> checkAttempts = maxCheckAttempts
+
+LTLSPEC
+-- it is always the case that
+-- if checkAttempts = maxCheckAttempts AND type = SOFT & mode has not changed then
+-- next type should be HARD (i.e. time to send a notification)
+  G (checkAttempts = maxCheckAttempts & type = SOFT & prevMode = mode) -> next(type) = HARD;
+
+LTLSPEC
+-- it is always the case that the check attempts resets to 1 if the mode changes
+G (next(prevMode) != mode -> next(checkAttempts) = 1)
+
+
+-- A service in `HARD` state should maintain its `HARD`
+-- state with its current `checkAttempts` value until a
+-- different response code is returned triggering a
+-- mode switch (if a service is in the `HARD` state type with
+-- `checkAttempts` equaling `maxCheckAttempts`,
+-- then the only possible next valuations for
+-- `(type, checkAttempts)` are `(SOFT, 1)` or `(HARD, checkAttempts)` )
+INVARSPEC
+  -- can be written as implication invariant
+  (type = HARD & checkAttempts = maxCheckAttempts) -> ((next(type) = SOFT & next(checkAttempts) = 1) | (next(type) = HARD & next(checkAttempts) = checkAttempts))
+LTLSPEC
+  -- can also be written as LTL specification using UNTIL (U) formula
+  -- always the case that if something's true, it's true until this other thing is true
+  -- always the case that if type=HARD & checkAttempts is at max, that stays true until type = SOFT & checkAttempts resets to 1
+  G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
+
+  -- Made a mistake in the above spec; I thought the Until LTL spec did not
+  -- require that terminating condition q to be true at any point.
+  -- Until LTLSPEC actually does require the q in "U q" to be true at some point. Rewrite in a way
+  -- that assumes q (the mode switch) does happen. In reality, this mode switch 
+  -- may not happen if a service stays in one of the modes indefinitely 
+  -- (F [2, ] (type = SOFT & checkAttempts = 1) )-> G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))

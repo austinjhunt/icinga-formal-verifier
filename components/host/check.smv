@@ -52,7 +52,6 @@ MODULE hostModule
     ((mode = DOWN & (res = 2 | res = 3)) & (checkAttempts < maxCheckAttempts) -> (next(checkAttempts) = checkAttempts + 1) & next(type) = SOFT) &
     ((mode = DOWN & (res = 2 | res = 3)) & (checkAttempts >= maxCheckAttempts) -> (next(checkAttempts) = checkAttempts) & next(type) = HARD) &
 
-    -- would be the same thing as (next(prevMode) = mode);
     (next(prevMode) = mode);
 
   -- initialize mode to PENDING, checkAttempts to 0, type to PENDING
@@ -103,11 +102,11 @@ LTLSPEC
   -- can also be written as LTL specification using UNTIL (U) formula
   -- always the case that if something's true, it's true until this other thing is true
   -- always the case that if type=HARD & checkAttempts is at max, that stays true until type = SOFT & checkAttempts resets to 1
-  G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
+  -- G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
 
   -- Made a mistake in the above spec; I thought the Until LTL spec did not
   -- require that terminating condition q to be true at any point.
   -- Until LTLSPEC actually does require the q in "U q" to be true at some point. Rewrite in a way
   -- that assumes q (the mode switch) does happen. In reality, this mode switch may not happen if a host
   -- stays UP or stays DOWN indefinitely.
-  -- (F [2, ] (type = SOFT & checkAttempts = 1) )-> G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
+  (F [2, +oo) (type = SOFT & checkAttempts = 1) )-> G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))
