@@ -1,5 +1,6 @@
 -- this checks the icinga 2 host entity model
 -- based on the component mode presented in the README of this folder
+-- https://icinga.com/docs/icinga-2/latest/doc/03-monitoring-basics/#hosts-and-services
 
 MODULE main
   VAR host : hostModule;

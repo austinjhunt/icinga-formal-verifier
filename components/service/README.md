@@ -1,6 +1,6 @@
-# Service Checks
+# [Service Checks](https://icinga.com/docs/icinga-2/latest/doc/03-monitoring-basics/#hosts-and-services)
 
-When you monitor services in Icinga 2, you need to configure service checks for the services that you want to monitor. In a nutshell, when you set up a service check, you're not just checking if a host is up or down, you're checking whether that host is either running something correctly or performing as expected. A service check can be assigned to specific hosts via assignment rules that define host-matching criteria/conditions, e.g. host name == "_database-server_". This of course tells the master which hosts to target for the service check. Since each host belongs to some zone and a given satellite(s) is/are responsible for said zone, this tells the master which satellite to send the check command to.
+When you monitor services in Icinga 2, you need to configure [service checks](https://icinga.com/docs/icinga-2/latest/doc/03-monitoring-basics/#hosts-and-services) for the services that you want to monitor. In a nutshell, when you set up a service check, you're not just checking if a host is up or down, you're checking whether that host is either running something correctly or performing as expected. A service check can be assigned to specific hosts via assignment rules that define host-matching criteria/conditions, e.g. host name == "_database-server_". This of course tells the master which hosts to target for the service check. Since each host belongs to some zone and a given satellite(s) is/are responsible for said zone, this tells the master which satellite to send the check command to.
 
 Once a service check has been configured, you are able to monitor the status of the respective Service. A service, when initially configured, is in a PENDING state. Once the check begins returning responses, the response codes **0, 1, 2, and 3** from the satellite indicate respectively the service states of **OK, WARNING, CRITICAL, and UNKNOWN.**
 
@@ -28,6 +28,10 @@ Having started with the above ESM diagram, I began pondering how to convey that 
 ![Reactive Component Model of an Icinga 2 Service Entity](../../img/service-component.png)
 
 Now, the model is not only simpler, but conveys a bit more information. A service entity within Icinga 2 takes as **input** the result of the last check execution (executed by the satellite responsible for it). Then, it uses some internal state variables `ca` (shortened version of the previous `check_attempts` variable), `mca` (shortened version of the previous `max_check_attempts`), and `prevMode` which can be one of `{PENDING, OK, WARN, CRIT, UN}` that is basically used as an indicator of a mode switch in order to reset `check_attempts`. Then, it outputs the state type (`HARD` or `SOFT`) and the mode (one of `{OK, WARN, CRIT, UN}`) for use by a notification component. It outputs these variables because a notification (if enabled and configured for a service) should only be sent for a given mode when the state type is `HARD`.
+
+## nuxmv
+
+The nuXmv module for checking this model is [here](check.smv).
 
 ### Input
 

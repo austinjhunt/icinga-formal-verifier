@@ -1,0 +1,89 @@
+-- this checks the icinga 2 check scheduler model
+-- based on the model presented in the readme of this folder
+-- https://icinga.com/docs/icinga-2/latest/doc/19-technical-concepts/#technical-concepts-check-scheduler
+
+MODULE main
+    VAR sched : schedulerModule;
+
+MODULE schedulerModule
+    VAR
+        chk: checkableModule;
+        checkableTimeToNextCheck : 0 .. 30; -- b/w 0 and 30 seconds
+        -- model the modes of the scheduler (extrapolated from documentation)
+        mode: {WAITING, VERIFYING, EXECUTING};
+
+        cpc: 0 .. 25;
+        idle: 0 .. 1024;
+
+    DEFINE mcc := 25; -- max concurrent check attempts (for a given checkable)
+    INIT cpc = 0; -- initialize currently pending checks to 0
+    INIT idle = 0; -- initialize current idle checkables to 0 (staged for scheduling)
+
+
+    TRANS
+        -- transitions for the system
+        (mode = WAITING & !(chk.present) -> next(mode) = WAITING & next(cpc) = cpc & next(idle) = idle) &
+        (mode = WAITING & chk.present -> next(mode) = VERIFYING & next(idle) = idle + 1 & next(cpc) = cpc) &
+        -- if pending not yet max
+        (mode = VERIFYING & cpc < mcc & (
+            -- if check ready for execution
+            (chk.enabled & chk.inCheckPeriod) | chk.forced ) ->
+                next(mode) = EXECUTING & next(cpc) = cpc + 1 & next(idle) = idle - 1 & next(checkableTimeToNextCheck) = 0
+        ) &
+        (mode = VERIFYING & cpc < mcc & (
+            -- if check NOT ready for execution, go back to waiting
+            (!chk.enabled | !chk.inCheckPeriod) & !chk.forced ) ->
+                next(mode) = WAITING & next(cpc) = cpc & next(idle) = idle - 1 & next(checkableTimeToNextCheck) = chk.timeToNextCheck
+        ) &
+        (mode = VERIFYING & cpc >= mcc -> next(idle) = idle - 1 & next(mode) = WAITING & next(checkableTimeToNextCheck) = chk.timeToNextCheck & next(cpc) = cpc ) &
+        (mode = EXECUTING -> next(cpc) = cpc - 1 & next(mode) = WAITING & next(checkableTimeToNextCheck) = chk.timeToNextCheck & next(idle) = idle)
+
+    INVARSPEC
+        -- Scheduler should not ever trigger execution of a check on a checkable not currently in its check period unless the check is forced
+        mode = VERIFYING -> (((!chk.inCheckPeriod & !chk.forced) -> next(mode) != EXECUTING) & ((!chk.inCheckPeriod & chk.forced) -> next(mode) = EXECUTING))
+
+    INVARSPEC
+        -- Scheduler should not ever trigger execution of a check that is not currently enabled unless the check is forced
+        mode = VERIFYING -> (chk.present -> (((!chk.enabled & !chk.forced) -> next(mode) != EXECUTING) & ((!chk.enabled & chk.forced) -> next(mode) = EXECUTING)))
+
+    INVARSPEC
+        -- Scheduler should not ever allow current pending checks for a checkable to exceed the maximum concurrent checks configured by the system admin
+        cpc <= mcc;
+
+    INVARSPEC
+        --  Scheduler should always add to the current idle checkables when a new checkable arrives
+        (mode = WAITING & chk.present) -> next(idle) = idle + 1;
+
+    INVARSPEC
+        -- Scheduler should always enter a verification mode after a new checkable arrives before making scheduling or execution decisions
+        (mode = WAITING & chk.present) -> next(mode) = VERIFYING;
+
+    INVARSPEC
+        -- Scheduler should always decrement the current idle checkables and increment the current pending checkables when transitioning from verified to execution;
+        (mode = VERIFYING & next(mode) = EXECUTING) -> next(idle) = idle - 1 & next(cpc) = cpc + 1;
+
+    INVARSPEC
+        -- Scheduler should always decrement the current pending checkables when execution of a check against a checkable when it  completes
+        (mode = EXECUTING & next(mode) = WAITING) -> next(cpc) = cpc - 1;
+
+    INVARSPEC
+        -- Scheduler should always set time to next check equal to zero if checks on the checkable are currently enabled and the current check period for that checkable is active
+        (mode = VERIFYING & ((chk.enabled & chk.inCheckPeriod) | chk.forced)) -> next(checkableTimeToNextCheck) = 0 & next(mode) = EXECUTING;
+
+    INVARSPEC
+        -- Scheduler should always set time to next check equal to the checkable's "next check" setting if checks on the checkable are currently not enabled or the current check period for that checkable is not yet active
+        (mode = VERIFYING & ((!chk.enabled | !chk.inCheckPeriod) & !chk.forced)) -> next(checkableTimeToNextCheck) = chk.timeToNextCheck & next(mode) = WAITING;
+
+MODULE checkableModule
+    VAR
+        id: 0 .. 1024;
+        present : boolean;
+        enabled : boolean;
+        inCheckPeriod: boolean;
+        timeToNextCheck: 0 .. 30;
+        forced: boolean;
+
+
+
+
+

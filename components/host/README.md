@@ -1,4 +1,4 @@
-# Host Checks
+# [Host Checks](https://icinga.com/docs/icinga-2/latest/doc/03-monitoring-basics/#hosts-and-services)
 
 A Host check is really just a check to ensure that a host is still alive, which equates to a ping against the target host (ICMP echo reques). In general, each host runs an agent for monitoring, e.g. NCPA for this case study. This `hostalive` check runs against all hosts, at a frequency of 1 check per minute. It can be disabled for certain hosts if they're not pingable, but for this case study, all hosts considered are pingable. Each host has an address (domain name or IP) and belongs to some [zone](../README.md). The zone of the host (e.g. the USA zone or the EU zone in the main README example diagram) tells the master which satellite(s) is/are responsible for that host and thus which satellite to send the hostalive (ping) check command to for execution. E.g. Master would send a hostalive check command to the USA satellite for execution against the USA 1 host (agent).
 
@@ -28,6 +28,10 @@ One limitation of this model is that it does not convey the relationship between
 ![Reactive Component Model of an Icinga 2 Host Entity](../../img/HostReactiveComponent.png)
 
 This reactive component model conveys the same assignments conveyed by the previous diagram but now also shows 1) the check result code `res` functioning as the input to the host entity, 2) the internal conditional state updates that depend on that input, and 3) the output of the resulting host mode (UP/DOWN) along with the `HARD` or `SOFT` state type that is a determining factor in whether notifications will be sent.
+
+## nuxmv
+
+The nuXmv module for checking this model is [here](check.smv).
 
 ### Input
 
