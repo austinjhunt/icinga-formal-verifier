@@ -1,0 +1,86 @@
+-- this is a module for model checking the monitoring agent model seen in the
+-- the readme of this folder
+MODULE main
+  VAR agent : agentModule;
+
+MODULE agentModule
+  VAR
+    -- an api request from a satellite
+    req: APIRequest;
+
+    -- an api response to be sent back to the requestor/satellite
+    resp: APIResponse;
+
+    -- whether or not the agent is ready to listen (relevant for STARTING->LISTENING)
+    ready: boolean;
+
+    -- whether or not the agent has responded to a given API request
+    responded: boolean;
+
+    -- which mode the agent is in, seen as the different modes in the ESM model
+    mode: {STARTING, LISTENING, EXECUTING, RESPONDING};
+
+  INIT mode = STARTING;
+  INIT ready = FALSE;
+
+  TRANS
+    (mode = STARTING & !ready -> next(mode) = STARTING) &
+    (mode = STARTING & ready -> next(mode) = LISTENING) &
+    (mode = LISTENING & !req.received -> next(mode) = LISTENING) &
+    (mode = LISTENING & req.received -> next(mode) = EXECUTING) &
+    (mode = EXECUTING & !resp.ready -> next(mode) = EXECUTING) &
+    (mode = EXECUTING & resp.ready -> next(mode) = RESPONDING) &
+    (mode = RESPONDING & !responded -> next(mode) = RESPONDING) &
+    -- don't worry about setting next(responded) because it won't be
+    -- used in the other modes/states
+    (mode = RESPONDING & responded -> next(mode) = LISTENING);
+
+  LTLSPEC
+    -- An agent should never transition from LISTENING to EXECUTING until a req has been received
+    -- i.e. if an agent ever receives a request
+    -- phrased more explicitly: if eventually the mode is listening and a request is received,
+    -- then if the mode is listening at a given point then it must stay listening until a  request is
+    -- received and the next mode is executing
+    F (mode = LISTENING & req.received) -> (mode = LISTENING -> (next(mode) = LISTENING U (req.received & next(mode) = EXECUTING)));
+
+  LTLSPEC
+    -- An agent should never transition from EXECUTING to RESPONDING until a response is ready to be sent back
+    -- phrased more explicitly: if eventually the mode is EXECUTING and a response is ready,
+    -- then if the mode is EXECUTING at a given point then it must stay EXECUTING until a response is
+    -- ready and the next mode is RESPONDING
+    F (mode = EXECUTING & resp.ready) -> (mode = EXECUTING -> (next(mode) = EXECUTING U (resp.ready & next(mode) = RESPONDING)));
+
+  LTLSPEC
+    -- An agent should never transition from STARTING to LISTENING until it is ready
+    -- phrased more explicitly: if eventually the mode is STARTING and ready is true,
+    -- then if the mode is STARTING at a given point then it must stay STARTING until ready=true
+    -- and the next mode is LISTENING
+    F (mode = STARTING & ready) -> (mode = STARTING -> (next(mode) = STARTING U (ready & next(mode) = LISTENING)));
+
+  LTLSPEC
+    -- An agent should never transition from RESPONDING to LISTENING until the agent has responded
+    -- phrased more explicitly: if eventually the mode is RESPONDING and responded = true,
+    -- then if the mode is RESPONDING at a given point then it must stay RESPONDING until responded=true
+    -- and the next mode is LISTENING
+    F (mode = RESPONDING & responded) -> (mode = RESPONDING -> (next(mode) = RESPONDING U (responded & next(mode) = LISTENING)));
+
+  INVARSPEC
+    -- An agent in STARTING mode should only ever transition to STARTING or LISTENING mode
+    mode = STARTING -> next(mode) = STARTING | next(mode) = LISTENING;
+  INVARSPEC
+    -- An agent in LISTENING mode should only ever transition to LISTENING or EXECUTING mode
+    mode = LISTENING -> next(mode) = LISTENING | next(mode) = EXECUTING;
+  INVARSPEC
+    -- An agent in EXECUTING mode should only ever transition to EXECUTING or RESPONDING mode
+    mode = EXECUTING -> next(mode) = EXECUTING | next(mode) = RESPONDING;
+  INVARSPEC
+    -- An agent in RESPONDING mode should only ever transition to RESPONDING or LISTENING mode
+    mode = RESPONDING -> next(mode) = RESPONDING | next(mode) = LISTENING;
+
+MODULE APIRequest
+  VAR
+    received : boolean;
+
+MODULE APIResponse
+  VAR
+    ready: boolean;
