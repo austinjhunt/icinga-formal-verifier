@@ -1,92 +1,109 @@
 -- module for symbolically model checking the Icinga 2 satellite component
--- as modeled in the README of this folder 
-MODULE main 
+-- as modeled in the README of this folder
+MODULE main
     VAR satellite : satelliteModule ;
 
 MODULE satelliteModule
-    VAR 
-        -- whether satellite is ready to begin monitoring 
-        readyToMonitor: boolean; 
+    VAR
+        -- whether satellite is ready to begin monitoring
+        readyToMonitor: boolean;
 
-        -- use a "newDeployment" boolean state variable to represent 
-        -- whether a new deployment from the master is present at a given round 
-        newDeployment: boolean; 
+        -- use a "newDeployment" boolean state variable to represent
+        -- whether a new deployment input from the master is present at a given round
+        newDeployment: boolean;
 
-        -- state variable to store what kind of checkable is currently being checked by satellite 
-        -- while in MONITORING mode
-        currentCheckable: {HOST, SERVICE} ;
+        -- model the configuration deployment input as a state variable
+        deployedConfigId: 0 .. 1024;
+        -- model the local configuration with as an integer, representing a unique config id
+        -- should be updated to match deployedConfigId when one is received
+        localConfigId: 0 .. 1024;
 
-        -- state variable to store the check result of the last check 
-        -- checkResult : CheckResult; 
+        -- current mode of operation
+        mode: {STARTING, MONITORING};
 
-        -- local configuration that should get updated; 
-        -- modeled abstractly with a separate nuXmv module (below)
-        localConfig: satConfigModule;
-        -- model the input configuration deployment from the master as a state variable 
-        -- can use this to keep track of most recent config deploymemtn
-        configDeployment: satConfigModule; 
 
-        -- current mode of operation 
-        mode: {STARTING, MONITORING};  
-    
-    INIT -- initial states ; 
-        (readyToMonitor = FALSE & mode = STARTING & localConfig.uniqueId = 0);
+        -- state variable indicating which checkable is being checked on current round (only relevant for MONITORING)
+        -- if in STARTING, checkable=NONE
+        -- this would be part of the config but is being abstracted into its own state var to address a specification
+        checkable: {HOST, SERVICE, NONE};
 
-    TRANS 
-        
-        -- if new deployment enter starting mode (unready) and keep that deployment available for access in next round ; update most recent config deployment to reflect new one 
-        (newDeployment -> next(mode) = STARTING & next(readyToMonitor) = FALSE & next(configDeployment.uniqueId) = configDeployment.uniqueId) & 
-        -- if starting mode and not ready, loop back to starting, update localConfig to match deployment, become ready ; persist the mostRecentDeployment 
-        (mode = STARTING & !readyToMonitor -> next(mode) = STARTING & (next(localConfig.uniqueId) = configDeployment.uniqueId) & next(readyToMonitor) = TRUE & next(configDeployment.uniqueId) = configDeployment.uniqueId) & 
-        -- if starting mode andready, move to monitoring and maintain local config; also persist the most recent config deployment (tracking purposes)
-        (mode = STARTING & readyToMonitor -> next(mode) = MONITORING & next(localConfig.uniqueId) = localConfig.uniqueId & next(configDeployment.uniqueId) = configDeployment.uniqueId) & 
-        -- if monitoring and no new new configs deployed, continue monitoring, next round's config should be the same; persist most recent config deployment
-        (mode = MONITORING & !newDeployment -> next(mode) = MONITORING & next(localConfig.uniqueId) = localConfig.uniqueId & next(configDeployment.uniqueId) = configDeployment.uniqueId ) & 
-        -- if monitoring and new config deployed, begin restarting, unready, next round's config should be the same (one more round before switch)
-        (mode = MONITORING & newDeployment -> next(mode) = STARTING & next(readyToMonitor) = FALSE & next(localConfig.uniqueId) = localConfig.uniqueId & next(configDeployment.uniqueId) = configDeployment.uniqueId & next(newDeployment) = TRUE);
+        -- check result of most recent check execution; could be a result for a host or service
+        checkResult: {NONE, HostCheckResult, ServiceCheckResult};
+
+    INIT -- initial states ;
+        -- not ready to monitor, in starting mode
+        -- initialize localConfigId to 0 (abstract, could be some base config or no config)
+        (readyToMonitor = FALSE & mode = STARTING & localConfigId = 0 & checkable = NONE & checkResult = NONE);
+
+    TRANS
+        -- starting up, not ready, no new deployment
+        ((mode = STARTING & !readyToMonitor & !newDeployment) -> next(mode) = STARTING & next(localConfigId) = localConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = readyToMonitor & next(checkable) = NONE & next(checkResult) = NONE) &
+
+        -- starting up, not ready, new deployment
+        ((mode = STARTING & !readyToMonitor & newDeployment) -> next(mode) = STARTING & next(localConfigId) = deployedConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = TRUE  & next(checkable) = NONE & next(checkResult) = NONE) &
+
+        -- starting up, ready to monitor, no new deployment
+        ((mode = STARTING & readyToMonitor & !newDeployment) -> next(mode) = MONITORING & next(localConfigId) = localConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = readyToMonitor &
+            ((next(checkable) = HOST & next(checkResult) = HostCheckResult) | ((next(checkable) = SERVICE & next(checkResult) = ServiceCheckResult)))) &
+
+        -- starting up, ready to monitor, AND new deployment; restart
+        ((mode = STARTING & readyToMonitor & newDeployment) -> next(mode) = STARTING & next(localConfigId) = deployedConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = TRUE  & next(checkable) = NONE & next(checkResult) = NONE) &
+
+        -- currently monitoring AND not ready is unreachable
+        -- ((mode = MONITORING & !readyToMonitor & !newDeployment) -> next(mode) = STARTING & next(localConfigId) = localConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = readyToMonitor) &
+        -- ((mode = MONITORING  & !readyToMonitor & newDeployment) ->  ) &
+
+        -- currently monitoring and ready to monitor and no new deployment; keep monitoring
+        ((mode = MONITORING & readyToMonitor & !newDeployment) -> next(mode) = MONITORING & next(localConfigId) = localConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = readyToMonitor &
+            ((next(checkable) = HOST & next(checkResult) = HostCheckResult) | ((next(checkable) = SERVICE & next(checkResult) = ServiceCheckResult)))) &
+
+        -- currently monitoring and ready to monitor and new deployment; go back to starting, no longer ready, new deployment remains true for next round
+        ((mode = MONITORING  & readyToMonitor & newDeployment) -> next(mode) = STARTING & next(localConfigId) = localConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = FALSE & next(newDeployment) = newDeployment & next(checkable) = NONE & next(checkResult) = NONE);
 
     INVARSPEC
-        -- A satellite should always restart itself whenever a new configuration is deployed
-        -- if a new config is deployed then a satellite should restart
-        newDeployment -> next(mode) = STARTING ; 
+        -- A satellite that is currently monitoring MUST be ready to monitor (however, a satellite ready to monitor may not be in monitoring mode)
+        -- i.e. currently monitoring AND not ready is unreachable
+        (mode = MONITORING -> readyToMonitor);
+
+    INVARSPEC
+        -- A satellite should always restart itself whenever a new configuration is deployed (but a satellite may self-loop in STARTING even without newDeployment, so no <->)
+        newDeployment -> next(mode) = STARTING;
 
     LTLSPEC
-        -- A satellite should stay in monitoring mode until there is a new deployment assuming that there is always eventually a new deployment.
+        -- Assuming there is always eventually a new deployment, then if a satellite is MONITORING, it should stay MONITORING until the new deployment arrives
         -- (because in order to use U q as a spec, q has to happen)
-       G F newDeployment -> G ((mode = MONITORING) -> mode = MONITORING U newDeployment);
-    
-    INVARSPEC
-        -- local config should match last deployment unless deployment is fresh and about to be applied 
-        localConfig.uniqueId = configDeployment.uniqueId <-> !newDeployment;
+       G F newDeployment -> G (mode = MONITORING -> mode = MONITORING U newDeployment);
+
+    LTLSPEC
+        -- Assuming there is always eventually a new deployment, a satellite's next config stay the same UNTIL it re-enters STARTING due to a new deployment
+        G F newDeployment -> G (next(localConfigId) = localConfigId U (mode=STARTING & newDeployment));
 
     INVARSPEC
-        --  A satellite should never enter a monitoring state after a deployment until its config matches that deployment
-        -- aka a satellite in MONITORING mode MUST have a config that matches the most recently deployed config 
-        mode = MONITORING <-> localConfig.uniqueId = configDeployment.uniqueId;
+        --  A satellite should never enter a monitoring state after a deployment until its config matches that new deployment
+        -- i.e. when in MONITORING, the localconfig must be equal to the last deployed config
+        -- BUT the localconfig is set to match the deployment while in STARTING, so the reverse implication is not true.
+        mode = MONITORING -> localConfigId = deployedConfigId;
 
---     INVARSPEC
---         -- A satellite should always output a check result with category = host and state one of [UP|DOWN] after checking on a host checkable
+    INVARSPEC
+        -- a satellite in MONITORING mode should always be outputting some type of check result (<-> applies; checkresult != None means MONITORING mode active)
+        mode = MONITORING <-> checkResult != NONE;
 
---     INVARSPEC
---         -- A satellite should always output a check result with category = service and state one of [OK|WARN|CRIT|UNKNOWN] after checking on a service checkable
+    INVARSPEC
+        -- A satellite in MONITORING mode should always output a host check result when a host checkable is checked (<-> applies)
+        mode = MONITORING & checkable = HOST <-> checkResult = HostCheckResult;
 
-
--- MODULE CheckResult
---     VAR 
---         present: boolean; 
---         type: {HARD, SOFT};
---         checkable: {HOST, SERVICE};
---         state: CheckableState(checkable);
-
--- MODULE CheckableState(checkable)
---     VAR 
---         state:
---     ASSIGN 
+    INVARSPEC
+        -- A satellite in MONITORING mode should always output a service check result when a service checkable is checked (<-> applies)
+        mode = MONITORING & checkable = SERVICE <-> checkResult = ServiceCheckResult;
 
 
 
-MODULE satConfigModule 
-    VAR 
-        -- use some integer to represent a unique id 
-        -- for comparison of one config to another 
-        uniqueId: 0 .. 1024;
+MODULE HostCheckResult
+    VAR
+        type: {HARD, SOFT};
+        state: {UP, DOWN};
+
+MODULE ServiceCheckResult
+    VAR
+        type: {HARD, SOFT};
+        state: {OK, WARN, CRIT, UNKNOWN};
