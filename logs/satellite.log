@@ -24,22 +24,11 @@
 *** Copyright (C) 2009-2019 by University of Trento and others
 *** See http://mathsat.fbk.eu
 
--- specification  G (configDeployment.newDeployment -> next(mode) = STARTING) IN satellite is false
--- as demonstrated by the following execution sequence
-Trace Description: LTL Counterexample 
-Trace Type: Counterexample 
-  -> State: 1.1 <-
-    satellite.readyToMonitor = FALSE
-    satellite.localConfig.newDeployment = FALSE
-    satellite.localConfig.uniqueId = 0
-    satellite.configDeployment.newDeployment = TRUE
-    satellite.configDeployment.uniqueId = 0
-    satellite.mode = STARTING
-  -> State: 1.2 <-
-    satellite.readyToMonitor = TRUE
-  -- Loop starts here
-  -> State: 1.3 <-
-    satellite.readyToMonitor = FALSE
-    satellite.configDeployment.newDeployment = FALSE
-    satellite.mode = MONITORING
-  -> State: 1.4 <-
+-- specification ( G ( F newDeployment) ->  G (mode = MONITORING -> (mode = MONITORING U newDeployment))) IN satellite is true
+-- specification ( G ( F newDeployment) ->  G (next(localConfigId) = localConfigId U (mode = STARTING & newDeployment))) IN satellite is true
+-- invariant (mode = MONITORING -> readyToMonitor) IN satellite is true
+-- invariant (newDeployment -> next(mode) = STARTING) IN satellite is true
+-- invariant (mode = MONITORING -> localConfigId = deployedConfigId) IN satellite is true
+-- invariant (mode = MONITORING <-> checkResult != NONE) IN satellite is true
+-- invariant ((mode = MONITORING & checkable = HOST) <-> checkResult = HostCheckResult) IN satellite is true
+-- invariant ((mode = MONITORING & checkable = SERVICE) <-> checkResult = ServiceCheckResult) IN satellite is true

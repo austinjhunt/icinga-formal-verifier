@@ -61,8 +61,7 @@ MODULE satelliteModule
         ((mode = MONITORING  & readyToMonitor & newDeployment) -> next(mode) = STARTING & next(localConfigId) = localConfigId & next(deployedConfigId) = deployedConfigId & next(readyToMonitor) = FALSE & next(newDeployment) = newDeployment & next(checkable) = NONE & next(checkResult) = NONE);
 
     INVARSPEC
-        -- A satellite that is currently monitoring MUST be ready to monitor (however, a satellite ready to monitor may not be in monitoring mode)
-        -- i.e. currently monitoring AND not ready is unreachable
+        -- A satellite that is currently monitoring MUST be ready to monitor (however, a satellite ready to monitor may not be in monitoring mode)  i.e. currently monitoring AND not ready is unreachable
         (mode = MONITORING -> readyToMonitor);
 
     INVARSPEC
@@ -70,8 +69,7 @@ MODULE satelliteModule
         newDeployment -> next(mode) = STARTING;
 
     LTLSPEC
-        -- Assuming there is always eventually a new deployment, then if a satellite is MONITORING, it should stay MONITORING until the new deployment arrives
-        -- (because in order to use U q as a spec, q has to happen)
+        -- Assuming there is always eventually a new deployment, then if a satellite is MONITORING, it should stay MONITORING until the new deployment arrives (because in order to use U q as a spec, q has to happen)
        G F newDeployment -> G (mode = MONITORING -> mode = MONITORING U newDeployment);
 
     LTLSPEC
@@ -79,9 +77,7 @@ MODULE satelliteModule
         G F newDeployment -> G (next(localConfigId) = localConfigId U (mode=STARTING & newDeployment));
 
     INVARSPEC
-        --  A satellite should never enter a monitoring state after a deployment until its config matches that new deployment
-        -- i.e. when in MONITORING, the localconfig must be equal to the last deployed config
-        -- BUT the localconfig is set to match the deployment while in STARTING, so the reverse implication is not true.
+        --  A satellite should never enter a monitoring state after a deployment until its config matches that new deployment i.e. when in MONITORING, the localconfig must be equal to the last deployed config BUT the localconfig is set to match the deployment while in STARTING, so the reverse implication is not true.
         mode = MONITORING -> localConfigId = deployedConfigId;
 
     INVARSPEC
