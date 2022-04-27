@@ -36,23 +36,63 @@ Config configDeployment;
 
 ```
 // a check result is produced for each and every enabled checkable within the configuration
-// this output
-{0, 1, 2, 3} checkResult;
+// check result represented as its own module in 
+// nuxmv: has properties 
+// - .type (HARD/SOFT) 
+// - .category (host/service)
+// - .state (OK/WARN/CRIT/UNKNOWN for category=service, UP/DOWN for category=host)
+CheckResult checkResult;
+
 ```
 
 ### Initialization
 
 ```
+// whether or not satellite is ready to begin monitoring
+bool ready := false; 
+// local configuration that gets updated when master deploys new config; initially has no value
+Config localConfig := null; 
+// mode of the satellite starts in STARTING
+{STARTING, MONITORING} mode := STARTING; 
 
 ```
 
 ### Update
 
 ```
+// while starting, continue starting until ready
+if (mode = STARTING) {
+    if (! ready ) {
+        // if not ready yet, get ready by updating local config 
+        localConfig := configDeployment;
+        ready := true; 
+    } 
+    // ready to go, switch to monitoring mode
+    else {
+        mode := MONITORING;
+    }
+}
+// if currently monitoring
+if (mode = MONITORING) {
+    // no new config has arrived from master so keep going
+    if (! configDeployment) {
+        // continue monitoring with current config
+        mode := MONITORING;
+    }
+    // a new config deployment has arrived from master so get "unready" and re-start with new config 
+    else {
+        mode := STARTING; ready := false;
+    }
+}
 
 ```
 
 ### Specifications
 
 - A satellite should always restart itself whenever a new configuration is deployed
-- A satellite should always
+- A satellite's config should always match the most recent config deployment from the master
+- A satellite should never enter a monitoring state until its config matches the most recent config deployment from the master
+- A satellite should never restart/re-apply configuration without being triggered by a new configuration deployment
+- A satellite should always output a check result with category = host and state one of [UP|DOWN] after checking on a host checkable
+- A satellite should always output a check result with category = service and state one of [OK|WARN|CRIT|UNKNOWN] after checking on a service checkable
+  

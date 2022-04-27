@@ -1,0 +1,92 @@
+-- module for symbolically model checking the Icinga 2 satellite component
+-- as modeled in the README of this folder 
+MODULE main 
+    VAR satellite : satelliteModule ;
+
+MODULE satelliteModule
+    VAR 
+        -- whether satellite is ready to begin monitoring 
+        readyToMonitor: boolean; 
+
+        -- use a "newDeployment" boolean state variable to represent 
+        -- whether a new deployment from the master is present at a given round 
+        newDeployment: boolean; 
+
+        -- state variable to store what kind of checkable is currently being checked by satellite 
+        -- while in MONITORING mode
+        currentCheckable: {HOST, SERVICE} ;
+
+        -- state variable to store the check result of the last check 
+        -- checkResult : CheckResult; 
+
+        -- local configuration that should get updated; 
+        -- modeled abstractly with a separate nuXmv module (below)
+        localConfig: satConfigModule;
+        -- model the input configuration deployment from the master as a state variable 
+        -- can use this to keep track of most recent config deploymemtn
+        configDeployment: satConfigModule; 
+
+        -- current mode of operation 
+        mode: {STARTING, MONITORING};  
+    
+    INIT -- initial states ; 
+        (readyToMonitor = FALSE & mode = STARTING & localConfig.uniqueId = 0);
+
+    TRANS 
+        
+        -- if new deployment enter starting mode (unready) and keep that deployment available for access in next round ; update most recent config deployment to reflect new one 
+        (newDeployment -> next(mode) = STARTING & next(readyToMonitor) = FALSE & next(configDeployment.uniqueId) = configDeployment.uniqueId) & 
+        -- if starting mode and not ready, loop back to starting, update localConfig to match deployment, become ready ; persist the mostRecentDeployment 
+        (mode = STARTING & !readyToMonitor -> next(mode) = STARTING & (next(localConfig.uniqueId) = configDeployment.uniqueId) & next(readyToMonitor) = TRUE & next(configDeployment.uniqueId) = configDeployment.uniqueId) & 
+        -- if starting mode andready, move to monitoring and maintain local config; also persist the most recent config deployment (tracking purposes)
+        (mode = STARTING & readyToMonitor -> next(mode) = MONITORING & next(localConfig.uniqueId) = localConfig.uniqueId & next(configDeployment.uniqueId) = configDeployment.uniqueId) & 
+        -- if monitoring and no new new configs deployed, continue monitoring, next round's config should be the same; persist most recent config deployment
+        (mode = MONITORING & !newDeployment -> next(mode) = MONITORING & next(localConfig.uniqueId) = localConfig.uniqueId & next(configDeployment.uniqueId) = configDeployment.uniqueId ) & 
+        -- if monitoring and new config deployed, begin restarting, unready, next round's config should be the same (one more round before switch)
+        (mode = MONITORING & newDeployment -> next(mode) = STARTING & next(readyToMonitor) = FALSE & next(localConfig.uniqueId) = localConfig.uniqueId & next(configDeployment.uniqueId) = configDeployment.uniqueId & next(newDeployment) = TRUE);
+
+    INVARSPEC
+        -- A satellite should always restart itself whenever a new configuration is deployed
+        -- if a new config is deployed then a satellite should restart
+        newDeployment -> next(mode) = STARTING ; 
+
+    LTLSPEC
+        -- A satellite should stay in monitoring mode until there is a new deployment assuming that there is always eventually a new deployment.
+        -- (because in order to use U q as a spec, q has to happen)
+       G F newDeployment -> G ((mode = MONITORING) -> mode = MONITORING U newDeployment);
+    
+    INVARSPEC
+        -- local config should match last deployment unless deployment is fresh and about to be applied 
+        localConfig.uniqueId = configDeployment.uniqueId <-> !newDeployment;
+
+    INVARSPEC
+        --  A satellite should never enter a monitoring state after a deployment until its config matches that deployment
+        -- aka a satellite in MONITORING mode MUST have a config that matches the most recently deployed config 
+        mode = MONITORING <-> localConfig.uniqueId = configDeployment.uniqueId;
+
+--     INVARSPEC
+--         -- A satellite should always output a check result with category = host and state one of [UP|DOWN] after checking on a host checkable
+
+--     INVARSPEC
+--         -- A satellite should always output a check result with category = service and state one of [OK|WARN|CRIT|UNKNOWN] after checking on a service checkable
+
+
+-- MODULE CheckResult
+--     VAR 
+--         present: boolean; 
+--         type: {HARD, SOFT};
+--         checkable: {HOST, SERVICE};
+--         state: CheckableState(checkable);
+
+-- MODULE CheckableState(checkable)
+--     VAR 
+--         state:
+--     ASSIGN 
+
+
+
+MODULE satConfigModule 
+    VAR 
+        -- use some integer to represent a unique id 
+        -- for comparison of one config to another 
+        uniqueId: 0 .. 1024;
