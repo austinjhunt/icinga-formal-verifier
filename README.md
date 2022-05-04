@@ -91,3 +91,8 @@ For the project I ended up developing models for the following components:
 - [Satellite](https://icinga.com/docs/icinga-2/latest/doc/06-distributed-monitoring/#roles-master-satellites-and-agents) (the entity responsible for monitoring hosts and services in a given zone when using a distributed Icinga 2 architecture; the satellite is the child of a master; the master deploys configuration to the satellite, the satellite schedules and executes checks according to that deployed configuration)
   - [README](components/satellite/README.md)
   - [Symbolic model checking with nuxmv](components/satellite/check.smv)
+
+## Executing the Model Checkers
+
+You can execute each individual `check.smv` file by running `./nuxmv components/<component>/check.smv`.
+Alternatively, you can run them all at once by simply executing the `automate.sh` script with `./automate.sh`. This script runs the `./nuxmv components/<component>/check.smv` for each component in the `components` folder, and outputs the results of each check.smv execution into a `logs/<component>.log` file named after the respective component.
