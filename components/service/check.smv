@@ -167,4 +167,4 @@ MODULE serviceModule
 
   LTLSPEC
     -- if service always eventually switches modes, then if the type is hard and the check attempts reaches max, it stays that way until type is soft and check attempts resets
-    G F (mode != next(mode)) -> G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 5))
+    G F (mode != next(mode)) -> G (type = HARD & checkAttempts = maxCheckAttempts  -> (type = HARD & checkAttempts = maxCheckAttempts) U (type = SOFT & checkAttempts = 1))

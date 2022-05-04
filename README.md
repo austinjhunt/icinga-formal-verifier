@@ -72,15 +72,22 @@ instance, we’ll focus on the following:
 
 Of course, the system also needs to store check results efficiently and reliably for historical viewing by system administrators. This means when the master receives check results, those check results need to end up in an accessible database. As outlined in [the docs](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db), Icinga 2 provides the `icingadb` feature that stores monitoring data in a [Redis](https://redis.io) in-memory database (this is the efficiency part). The [IcingaDB service](https://github.com/icinga/icingadb) works continously to collect and sync that in-memory database with a persistent backend MySQL database (this provides the reliability). This is another example of a core component with some significant complexity.
 
-### Planning
+## Models
 
-It would be impractical to try to wrap a complex distributed system like this into a single system model
-for this project, so my plan is to break this architecture into core components, define specifications for
-said components, and model them using the tools mentioned above. For example, the distinct roles
-could potentially be modeled separately. An agent needs to constantly listen for requests from the
-satellite and be able to access and send requested information back to that satellite about a host. A
-satellite needs to listen for check commands from the master to execute checks, execute those checks,
-and send the check results back up the chain. The master, of course, is quite a complex system in and of itself since it
-handles all logical decision making that drives the action of the rest of the system. The master may be
-the most interesting and vital component to formally model and verify, if components were to be
-prioritized.
+For the project I ended up developing models for the following components:
+
+- [Agent](https://icinga.com/docs/icinga-2/latest/doc/07-agent-based-monitoring/) (the service running on each host being monitored that listens for and responds to requests for information about that host or services on that host, e.g. [NCPA](https://www.nagios.org/ncpa/))
+  - [README](components/agent/README.md)
+  - [Symbolic model checking with nuxmv](components/agent/check.smv)
+- [Check Scheduler](https://icinga.com/docs/icinga-2/latest/doc/19-technical-concepts/#check-scheduler) (an independent scheduling module running on each satellite for scheduling check executions)
+  - [README](components/checkscheduler/README.md)
+  - [Symbolic model checking with nuxmv](components/checkscheduler/check.smv)
+- [Host](https://icinga.com/docs/icinga-2/latest/doc/03-monitoring-basics/#hosts-and-services) (the entity in Icinga 2 representing a host being monitored, where that host can be either up or down at any point in time)
+  - [README](components/host/README.md)
+  - [Symbolic model checking with nuxmv](components/host/check.smv)
+- [Service](https://icinga.com/docs/icinga-2/latest/doc/03-monitoring-basics/#hosts-and-services) (the entity in Icinga 2 representing a service being monitored on a given host, e.g. CPU usage, memory usage, disk usage, etc.; a service can be in OK, WARN, CRITICAL, or UNKNOWN state at any point in time, where the boundaries between those states are fully configurable by the system administrator)
+  - [README](components/service/README.md)
+  - [Symbolic model checking with nuxmv](components/service/check.smv)
+- [Satellite](https://icinga.com/docs/icinga-2/latest/doc/06-distributed-monitoring/#roles-master-satellites-and-agents) (the entity responsible for monitoring hosts and services in a given zone when using a distributed Icinga 2 architecture; the satellite is the child of a master; the master deploys configuration to the satellite, the satellite schedules and executes checks according to that deployed configuration)
+  - [README](components/satellite/README.md)
+  - [Symbolic model checking with nuxmv](components/satellite/check.smv)
